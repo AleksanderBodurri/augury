@@ -1,5 +1,5 @@
 import { compare } from '../utils/patch';
-import { isAngular, isDebugMode } from './utils/app-check';
+import { appIsStable, isAngular, isDebugMode, isIvy } from './utils/app-check';
 
 import { MutableTree, Node, Path, instanceWithMetadata, serializePath } from '../tree';
 
@@ -42,7 +42,7 @@ import { SimpleOptions } from '../options';
 import { MessagePipeBackend } from 'feature-modules/.lib';
 import { highlighter } from 'feature-modules/highlighter/backend/index';
 import { ApplicationRef, NgModuleRef } from '@angular/core';
-import { timer, Subscription, Subject } from 'rxjs';
+import { timer, Subscription, Subject, Observable, BehaviorSubject } from 'rxjs';
 import { takeWhile, filter } from 'rxjs/operators';
 
 import 'reflect-metadata';
@@ -235,16 +235,19 @@ const resubscribe = () => {
         .then(() => {
           runAndHandleUncaughtExceptions(() => {
             const roots = collectRoots();
+
+            let appRef: ApplicationRef;
+
             if (roots.length) {
               let sanity;
               // Adding sanity threshold to make sure
               // larger app's doesn't get flooded
               const sanityThreshold = 0.5 * 1000; // 0.5 seconds
-              const appRef: ApplicationRef = parseModulesFromRootElement(roots[0], parsedModulesData);
+              appRef = parseModulesFromRootElement(roots[0], parsedModulesData);
               if (isStableSubscription) {
                 isStableSubscription.unsubscribe();
               }
-              isStableSubscription = appRef.isStable
+              isStableSubscription = appIsStable({ appRef, parsedModulesData, roots })
                 .pipe(
                   // Make sure sanity is undefined (initial run) or that sanitythreshold is passed
                   filter(() => sanity === undefined || new Date().getTime() - sanity > sanityThreshold)
