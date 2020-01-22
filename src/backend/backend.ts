@@ -1,11 +1,11 @@
 import { compare } from '../utils/patch';
-import { appIsStable, isAngular, isDebugMode, isIvy } from './utils/app-check';
+import { appIsStable, isAngular, isDebugMode } from './utils/app-check';
 
 import { MutableTree, Node, Path, instanceWithMetadata, serializePath } from '../tree';
 
 import { onElementFound, onFindElement } from './utils/find-element';
 
-import { parseModulesFromRootElement, parseModulesFromRouter, NgModulesRegistry } from './utils/parse-modules';
+import { parseModulesFromRouter, NgModulesRegistry } from './utils/parse-modules';
 
 import { parseNgVersion } from './utils/parse-ng-version';
 
@@ -236,18 +236,16 @@ const resubscribe = () => {
           runAndHandleUncaughtExceptions(() => {
             const roots = collectRoots();
 
-            let appRef: ApplicationRef;
-
             if (roots.length) {
               let sanity;
               // Adding sanity threshold to make sure
               // larger app's doesn't get flooded
               const sanityThreshold = 0.5 * 1000; // 0.5 seconds
-              appRef = parseModulesFromRootElement(roots[0], parsedModulesData);
               if (isStableSubscription) {
                 isStableSubscription.unsubscribe();
               }
-              isStableSubscription = appIsStable({ appRef, parsedModulesData, roots })
+              const stabilityObject = { appRef: null, parsedModulesData, roots };
+              isStableSubscription = appIsStable(stabilityObject)
                 .pipe(
                   // Make sure sanity is undefined (initial run) or that sanitythreshold is passed
                   filter(() => sanity === undefined || new Date().getTime() - sanity > sanityThreshold)
@@ -258,11 +256,12 @@ const resubscribe = () => {
                   updateRouterTree();
                   send(MessageFactory.ping());
                 });
-              ngModuleRef = (appRef as any)._injector;
-              ngModuleRef.onDestroy(() => {
-                ngModuleRef = undefined;
-                listenForSomeTimeAndMaybeResubscribe(1000);
-              });
+              // TODO: figure out how to make this work for Ivy or remove
+              // ngModuleRef = (stabilityObject.appRef as any)._injector;
+              // ngModuleRef.onDestroy(() => {
+              //   ngModuleRef = undefined;
+              //   listenForSomeTimeAndMaybeResubscribe(1000);
+              // });
               sendNgModulesMessage();
             }
           });
